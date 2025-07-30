@@ -1,9 +1,9 @@
-# DevSecOps Troubleshooting Kit
 
 <div align="center">
   <h1>DevSecOps Troubleshooting Kit</h1>
-  <p><strong>The Ultimate Security-First Troubleshooting Arsenal for Modern DevOps Teams</strong></p>
+  <p><strong>The  Security-First Troubleshooting Guide for DevOps Teams</strong></p>
   
+</div align="center">
 
 > Your guide for hunting down security vulnerabilities, squashing bugs, and securing your infrastructure: from code to cloud and everything in between.
 
@@ -23,22 +23,20 @@
 
 In a world where a single misconfiguration can lead to a massive data breach, this kit serves as an operations manual for:
 
-- **Threat Detection** - Identify security issues 
-
+- **Threat Detection** - Identify security issues before they become breaches
 - **Systematic Vulnerability Resolution** - Fix problems the right way, the first time
 - **Proactive Security Hardening** - Build defense in depth across your entire stack
-- **Incident Response Excellence** - When things go wrong, respond like accordingly
+- **Incident Response Excellence** - When things go wrong, respond swiftly and effectively
 
 ## Why This Kit Exists
 
 ### The Reality Check
 
-
 It exists because:
 
 - **Security can't be an afterthought** - It must be baked into every layer
 - **Traditional DevOps guides miss critical security angles** - We fill that gap
-- **attacks demand defenses** - Theory isn't enough
+- **Real attacks demand practical defenses** - Theory isn't enough
 - **Every team member needs security skills** - Not just the security team
 - **Speed and security must coexist** - One shouldn't sacrifice the other
 
@@ -100,51 +98,51 @@ chmod +x scripts/security-baseline.sh
 ## Security Domains
 
 ### Application Security
-| Focus Area | Quick Access | Key Coverage |
-|------------|--------------|--------------|
-| **Code Scanning** | [`appsec/code-scanning.md`](appsec/code-scanning.md) (yet to be added) | SAST, secrets detection, dependency vulnerabilities |
-| **API Security** | [`appsec/api-security.md`](appsec/api-security.md) (yet to be added) | Authentication, rate limiting, input validation |
-| **Web App Security** | [`appsec/webapp-security.md`](appsec/webapp-security.md) (yet to be added) | OWASP Top 10, XSS, SQLi, CSRF |
-| **Mobile Security** | [`appsec/mobile-security.md`](appsec/mobile-security.md) (yet to be added) | iOS/Android security, certificate pinning |
+| Focus Area | Quick Access | Status | Key Coverage |
+|------------|--------------|--------|--------------|
+| **Code Scanning** | [`appsec/code-scanning.md`](appsec/code-scanning.md) |  | SAST, secrets detection, dependency vulnerabilities |
+| **API Security** | [`appsec/api-security.md`](appsec/api-security.md) |  | Authentication, rate limiting, input validation |
+| **Web App Security** | [`appsec/webapp-security.md`](appsec/webapp-security.md) |  | OWASP Top 10, XSS, SQLi, CSRF |
+| **Mobile Security** | [`appsec/mobile-security.md`](appsec/mobile-security.md) |  | iOS/Android security, certificate pinning |
 
 ### Container & Orchestration Security
-| Platform | Quick Access | Critical Areas |
-|----------|--------------|----------------|
-| **Docker Security** | [`containers/docker-security.md`](containers/docker-security.md) (yet to be added) | Image scanning, runtime protection, secrets management |
-| **Kubernetes Security** | [`kubernetes/k8s-security.md`](kubernetes/k8s-security.md) (yet to be added) | RBAC, network policies, pod security standards |
-| **Container Registries** | [`containers/registry-security.md`](containers/registry-security.md) | Image signing, vulnerability scanning, access control |
-| **Service Mesh Security** | [`kubernetes/service-mesh-security.md`](kubernetes/service-mesh-security.md) (yet to be added) | mTLS, authorization policies, observability |
+| Platform | Quick Access | Status | Critical Areas |
+|----------|--------------|--------|----------------|
+| **Docker Security** | [`containers/docker-security.md`](containers/docker-security.md) |  | Image scanning, runtime protection, secrets management |
+| **Kubernetes Security** | [`kubernetes/k8s-security.md`](kubernetes/k8s-security.md) |  | RBAC, network policies, pod security standards |
+| **Container Registries** | [`containers/registry-security.md`](containers/registry-security.md) |  | Image signing, vulnerability scanning, access control |
+| **Service Mesh Security** | [`kubernetes/service-mesh-security.md`](kubernetes/service-mesh-security.md) |  | mTLS, authorization policies, observability |
 
 ### Cloud Security
-| Provider | Quick Access | Specializations |
-|----------|--------------|-----------------|
-| **AWS Security** | [`cloud/aws-security.md`](cloud/aws-security.md) | IAM, VPC security, GuardDuty, Security Hub |
-| **Azure Security** | [`cloud/azure-security.md`](cloud/azure-security.md) | Azure AD, Key Vault, Defender, Sentinel |
-| **GCP Security** | [`cloud/gcp-security.md`](cloud/gcp-security.md) (yet to be added) | Cloud IAM, VPC Service Controls, Security Command Center |
-| **Multi-Cloud Security** | [`cloud/multi-cloud-security.md`](cloud/multi-cloud-security.md) (yet to be added) | CSPM, unified policies, cross-cloud networking |
+| Provider | Quick Access | Status | Specializations |
+|----------|--------------|--------|-----------------|
+| **AWS Security** | [`cloud/aws-security.md`](cloud/aws-security.md) |  | IAM, VPC security, GuardDuty, Security Hub |
+| **Azure Security** | [`cloud/azure-security.md`](cloud/azure-security.md) |  | Azure AD, Key Vault, Defender, Sentinel |
+| **GCP Security** | [`cloud/gcp-security.md`](cloud/gcp-security.md) |  | Cloud IAM, VPC Service Controls, Security Command Center |
+| **Multi-Cloud Security** | [`cloud/multi-cloud-security.md`](cloud/multi-cloud-security.md) |  | CSPM, unified policies, cross-cloud networking |
 
 ### CI/CD Pipeline Security
-| Component | Quick Access | Focus |
-|-----------|--------------|-------|
-| **Pipeline Security** | [`cicd/pipeline-security.md`](cicd/pipeline-security.md) | Secure builds, artifact signing, secret injection |
-| **Supply Chain Security** | [`cicd/supply-chain-security.md`](cicd/supply-chain-security.md) (yet to be added) | SBOM, dependency management, provenance |
-| **GitOps Security** | [`cicd/gitops-security.md`](cicd/gitops-security.md) (yet to be added) | Git security, policy as code, drift detection |
+| Component | Quick Access | Status | Focus |
+|-----------|--------------|--------|-------|
+| **Pipeline Security** | [`cicd/pipeline-security.md`](cicd/pipeline-security.md) |  | Secure builds, artifact signing, secret injection |
+| **Supply Chain Security** | [`cicd/supply-chain-security.md`](cicd/supply-chain-security.md) |  | SBOM, dependency management, provenance |
+| **GitOps Security** | [`cicd/gitops-security.md`](cicd/gitops-security.md) |  | Git security, policy as code, drift detection |
 
 ### Security Operations
-| Function | Quick Access | Coverage |
-|----------|--------------|----------|
-| **Incident Response** | [`secops/incident-response.md`](secops/incident-response.md) | Playbooks, forensics, evidence collection |
-| **Threat Hunting** | [`secops/threat-hunting.md`](secops/threat-hunting.md) | Indicators of compromise, behavioral analysis |
-| **SIEM & Monitoring** | [`secops/siem-monitoring.md`](secops/siem-monitoring.md) | Log analysis, alerting, correlation rules |
-| **Compliance** | [`secops/compliance.md`](secops/compliance.md) (yet to be added) | SOC2, ISO27001, PCI-DSS, HIPAA |
+| Function | Quick Access | Status | Coverage |
+|----------|--------------|--------|----------|
+| **Incident Response** | [`secops/incident-response.md`](secops/incident-response.md) |  | Playbooks, forensics, evidence collection |
+| **Threat Hunting** | [`secops/threat-hunting.md`](secops/threat-hunting.md) |  | Indicators of compromise, behavioral analysis |
+| **SIEM & Monitoring** | [`secops/siem-monitoring.md`](secops/siem-monitoring.md) |  | Log analysis, alerting, correlation rules |
+| **Compliance** | [`secops/compliance.md`](secops/compliance.md) |  | SOC2, ISO27001, PCI-DSS, HIPAA |
 
 ### Infrastructure Security
-| Component | Quick Access | Key Areas |
-|-----------|--------------|-----------|
-| **Network Security** | [`infrastructure/network-security.md`](infrastructure/network-security.md) | Firewall rules, segmentation, zero trust |
-| **Identity & Access** | [`infrastructure/identity-access.md`](infrastructure/identity-access.md) | SSO, MFA, privileged access management |
-| **Secrets Management** | [`infrastructure/secrets-management.md`](infrastructure/secrets-management.md) | Vault operations, rotation, encryption |
-| **Data Security** | [`infrastructure/data-security.md`](infrastructure/data-security.md) (yet to be added) | Encryption at rest/transit, DLP, backup security |
+| Component | Quick Access | Status | Key Areas |
+|-----------|--------------|--------|-----------|
+| **Network Security** | [`infrastructure/network-security.md`](infrastructure/network-security.md) |  | Firewall rules, segmentation, zero trust |
+| **Identity & Access** | [`infrastructure/identity-access.md`](infrastructure/identity-access.md) |  | SSO, MFA, privileged access management |
+| **Secrets Management** | [`infrastructure/secrets-management.md`](infrastructure/secrets-management.md) |  | Vault operations, rotation, encryption |
+| **Data Security** | [`infrastructure/data-security.md`](infrastructure/data-security.md) |  | Encryption at rest/transit, DLP, backup security |
 
 ## Emergency Response
 
@@ -197,30 +195,30 @@ grep -E "su:|sudo:" /var/log/secure | grep -i failed
 
 ### Complete Security Troubleshooting Scenarios
 
-| Scenario | Difficulty | Impact | Guide |
-|----------|------------|-------------------|-------|
-| **Exposed AWS Credentials** | Medium | Data breach, resource hijacking | [`scenarios/exposed-credentials.md`](scenarios/exposed-credentials.md) (yet to be added) |
-| **Kubernetes Crypto Mining** | High | Resource theft, backdoors | [`scenarios/k8s-cryptomining.md`](scenarios/k8s-cryptomining.md) (yet to be added) |
-| **Supply Chain Compromise** | High | Widespread impact | [`scenarios/supply-chain-attack.md`](scenarios/supply-chain-attack.md) (yet to be added) |
-| **Ransomware Recovery** | Critical | Business continuity | [`scenarios/ransomware-response.md`](scenarios/ransomware-response.md) (yet to be added) |
-| **Container Escape** | High | Host compromise | [`scenarios/container-escape.md`](scenarios/container-escape.md) (yet to be added) |
-| **API Key Leak** | Medium | Unauthorized access | [`scenarios/api-key-leak.md`](scenarios/api-key-leak.md) (yet to be added) |
-| **DDoS Under Fire** | High | Service availability | [`scenarios/ddos-response.md`](scenarios/ddos-response.md) (yet to be added) |
+| Scenario | Difficulty | Status | Impact | Guide |
+|----------|------------|--------|--------|-------|
+| **Exposed AWS Credentials** | Medium |  | Data breach, resource hijacking | [`scenarios/exposed-credentials.md`](scenarios/exposed-credentials.md) |
+| **Kubernetes Crypto Mining** | High |  | Resource theft, backdoors | [`scenarios/k8s-cryptomining.md`](scenarios/k8s-cryptomining.md) |
+| **Supply Chain Compromise** | High |  | Widespread impact | [`scenarios/supply-chain-attack.md`](scenarios/supply-chain-attack.md) |
+| **Ransomware Recovery** | Critical |  | Business continuity | [`scenarios/ransomware-response.md`](scenarios/ransomware-response.md) |
+| **Container Escape** | High |  | Host compromise | [`scenarios/container-escape.md`](scenarios/container-escape.md) |
+| **API Key Leak** | Medium |  | Unauthorized access | [`scenarios/api-key-leak.md`](scenarios/api-key-leak.md) |
+| **DDoS Under Fire** | High |  | Service availability | [`scenarios/ddos-response.md`](scenarios/ddos-response.md) |
 
 ## Security Automation Scripts
 
 ### Available Arsenal
 
-| Script | Purpose | Usage |
-|--------|---------|-------|
-| [`security-baseline.sh`](scripts/security-baseline.sh) (yet to be added) | Establish security baseline | `./scripts/security-baseline.sh` |
-| [`container-scan.sh`](scripts/container-scan.sh) (yet to be added) | Deep container security scan | `./scripts/container-scan.sh <image>` |
-| [`secret-hunter.sh`](scripts/secret-hunter.sh) (yet to be added) | Hunt for exposed secrets | `./scripts/secret-hunter.sh <path>` |
-| [`k8s-security-audit.sh`](scripts/k8s-security-audit.sh) | Kubernetes security audit | `./scripts/k8s-security-audit.sh` |
-| [`cloud-posture-check.sh`](scripts/cloud-posture-check.sh) (yet to be added) | Cloud security posture | `./scripts/cloud-posture-check.sh <provider>` |
-| [`vulnerability-scan.sh`](scripts/vulnerability-scan.sh) (yet to be added) | Full stack vuln scan | `./scripts/vulnerability-scan.sh` |
-| [`incident-response.sh`](scripts/incident-response.sh) (yet to be added) | Automated IR workflow | `./scripts/incident-response.sh --start` |
-| [`compliance-checker.sh`](scripts/compliance-checker.sh) (yet to be added) | Compliance validation | `./scripts/compliance-checker.sh <standard>` |
+| Script | Status | Purpose | Usage |
+|--------|--------|---------|-------|
+| [`security-baseline.sh`](scripts/security-baseline.sh) |  | Establish security baseline | `./scripts/security-baseline.sh` |
+| [`container-scan.sh`](scripts/container-scan.sh) |  | Deep container security scan | `./scripts/container-scan.sh <image>` |
+| [`secret-hunter.sh`](scripts/secret-hunter.sh) |  | Hunt for exposed secrets | `./scripts/secret-hunter.sh <path>` |
+| [`k8s-security-audit.sh`](scripts/k8s-security-audit.sh) |  | Kubernetes security audit | `./scripts/k8s-security-audit.sh` |
+| [`cloud-posture-check.sh`](scripts/cloud-posture-check.sh) |  | Cloud security posture | `./scripts/cloud-posture-check.sh <provider>` |
+| [`vulnerability-scan.sh`](scripts/vulnerability-scan.sh) |  | Full stack vuln scan | `./scripts/vulnerability-scan.sh` |
+| [`incident-response.sh`](scripts/incident-response.sh) |  | Automated IR workflow | `./scripts/incident-response.sh --start` |
+| [`compliance-checker.sh`](scripts/compliance-checker.sh) |  | Compliance validation | `./scripts/compliance-checker.sh <standard>` |
 
 ### Quick Script Examples
 
@@ -273,46 +271,50 @@ Each scenario includes:
 ```
 devsecops-troubleshooting-kit/
 ├── appsec/                      # Application security guides
-│   ├── code-scanning.md (yet to be added)
-│   ├── api-security.md (yet to be added)
-│   ├── webapp-security.md (yet to be added)
-│   └── mobile-security.md (yet to be added)
-├── containers/                   # Container security
-│   ├── docker-security.md (yet to be added)
-│   ├── registry-security.md
-│   └── runtime-protection.md (yet to be added)
-├── kubernetes/                   # K8s security
-│   ├── k8s-security.md (yet to be added)
-│   ├── rbac-troubleshooting.md
-│   ├── network-policies.md (yet to be added)
-│   └── service-mesh-security.md (yet to be added)
-├── cloud/                        # Cloud provider security
-│   ├── aws-security.md
-│   ├── azure-security.md
-│   ├── gcp-security.md (yet to be added)
-│   └── multi-cloud-security.md (yet to be added)
-├── cicd/                         # Pipeline security
-│   ├── pipeline-security.md
-│   ├── supply-chain-security.md (yet to be added)
-│   └── gitops-security.md (yet to be added)
-├── secops/                       # Security operations
-│   ├── incident-response.md
-│   ├── threat-hunting.md
-│   ├── siem-monitoring.md
-│   └── compliance.md (yet to be added)
-├── infrastructure/               # Infrastructure security
-│   ├── network-security.md
-│   ├── identity-access.md
-│   ├── secrets-management.md
-│   └── data-security.md (yet to be added)
-├── scenarios/                    # scenarios
-│   └── [various incident scenarios] (yet to be added)
-├── scripts/                      # Automation scripts
-│   └── [security tools and scripts] (most yet to be added)
-├── playbooks/                    # Response playbooks
-│   └── [incident response playbooks]
+│   ├── code-scanning.md         #  Yet to be added
+│   ├── api-security.md          #  Yet to be added  
+│   ├── webapp-security.md       #  Yet to be added
+│   └── mobile-security.md       #  Yet to be added
+├── containers/                  # Container security
+│   ├── docker-security.md       #  Yet to be added
+│   ├── registry-security.md     #  Available
+│   └── runtime-protection.md    #  Yet to be added
+├── kubernetes/                  # K8s security
+│   ├── k8s-security.md          #  Yet to be added
+│   ├── rbac-troubleshooting.md  #  Available
+│   ├── network-policies.md      #  Yet to be added
+│   └── service-mesh-security.md #  Yet to be added
+├── cloud/                       # Cloud provider security
+│   ├── aws-security.md          #  Available
+│   ├── azure-security.md        #  Available
+│   ├── gcp-security.md          #  Yet to be added
+│   └── multi-cloud-security.md  #  Yet to be added
+├── cicd/                        # Pipeline security
+│   ├── pipeline-security.md     #  Available
+│   ├── supply-chain-security.md #  Yet to be added
+│   └── gitops-security.md       #  Yet to be added
+├── secops/                      # Security operations
+│   ├── incident-response.md     #  Available
+│   ├── threat-hunting.md        #  Available
+│   ├── siem-monitoring.md       #  Available
+│   └── compliance.md            #  Yet to be added
+├── infrastructure/              # Infrastructure security
+│   ├── network-security.md      #  Available
+│   ├── identity-access.md       #  Available
+│   ├── secrets-management.md    #  Available
+│   └── data-security.md         #  Yet to be added
+├── scenarios/                   # Incident scenarios
+│   └── [incident scenarios]     #  Yet to be added
+├── scripts/                     # Automation scripts
+│   ├── k8s-security-audit.sh    #  Available
+│   └── [other security tools]   #  Most yet to be added
+├── playbooks/                   # Response playbooks
+│   ├── incident-response/       #  Available
+│   ├── hardening/              #  Available
+│   ├── vulnerability-scanning/  #  Available
+│   └── backup-recovery/         #  Available
 └── assets/
-    ├── diagrams/                 # Architecture diagrams
+    ├── diagrams/                # Architecture diagrams
     └── cheatsheets/             # Quick reference guides
 ```
 
@@ -361,5 +363,4 @@ git push origin feature/new-security-guide
 *- Gene Spafford*
 
 But since we can't do that, let's make our systems as secure as practically possible!
-
-</div>
+</div align="center">
