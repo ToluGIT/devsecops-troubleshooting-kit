@@ -1,0 +1,488 @@
+---
+# Security Hardening Playbook
+# This playbook applies security hardening measures across different system types
+
+- name: Security Hardening - All Systems
+  hosts: all
+  become: yes
+  vars:
+    # Hardening configuration
+    hardening_level: "{{ hardening_level | default('standard') }}"  # minimal, standard, strict
+    enable_firewall: "{{ enable_firewall | default(true) }}"
+    configure_ssh: "{{ configure_ssh | default(true) }}"
+    install_security_tools: "{{ install_security_tools | default(true) }}"
+    configure_logging: "{{ configure_logging | default(true) }}"
+    apply_kernel_hardening: "{{ apply_kernel_hardening | default(true) }}"
+    
+    # Security parameters
+    password_max_age: "{{ password_max_age | default(90) }}"
+    password_min_age: "{{ password_min_age | default(1) }}"
+    password_warn_age: "{{ password_warn_age | default(7) }}"
+    login_retries: "{{ login_retries | default(3) }}"
+    session_timeout: "{{ session_timeout | default(600) }}"
+    
+  pre_tasks:
+    - name: Validate hardening level
+      fail:
+        msg: "Invalid hardening level. Must be one of: minimal, standard, strict"
+      when: hardening_level not in ['minimal', 'standard', 'strict']
+      
+    - name: Create hardening log
+      file:
+        path: /var/log/security-hardening.log
+        state: touch
+        mode: '0600'
+        owner: root
+        group: root
+        
+    - name: Log hardening start
+      lineinfile:
+        path: /var/log/security-hardening.log
+        line: "{{ ansible_date_time.iso8601 }} - Security hardening started ({{ hardening_level }} level)"
+        
+  tasks:
+    # Package management and updates
+    - name: Update package cache (Debian/Ubuntu)
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+      
+    - name: Update package cache (RedHat/CentOS)
+      yum:
+        update_cache: yes
+      when: ansible_os_family == "RedHat"
+      
+    - name: Install essential security packages
+      package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - fail2ban
+        - aide
+        - auditd
+        - logwatch
+        - rkhunter
+        - chkrootkit
+        - psacct
+        - ntp
+        - chrony
+      when: install_security_tools
+      ignore_errors: yes
+      
+    # User and authentication hardening
+    - name: Set password policy in login.defs
+      lineinfile:
+        path: /etc/login.defs
+        regexp: "^{{ item.key }}"
+        line: "{{ item.key }}\t{{ item.value }}"
+        backup: yes
+      loop:
+        - { key: "PASS_MAX_DAYS", value: "{{ password_max_age }}" }
+        - { key: "PASS_MIN_DAYS", value: "{{ password_min_age }}" }
+        - { key: "PASS_WARN_AGE", value: "{{ password_warn_age }}" }
+        - { key: "LOGIN_RETRIES", value: "{{ login_retries }}" }
+        - { key: "ENCRYPT_METHOD", value: "SHA512" }
+        - { key: "UMASK", value: "027" }
+        
+    - name: Configure PAM password complexity (Debian)
+      lineinfile:
+        path: /etc/pam.d/common-password
+        regexp: "pam_pwquality.so"
+        line: "password requisite pam_pwquality.so retry=3 minlen=8 maxrepeat=3 ucredit=-1 lcredit=-1 dcredit=-1 ocredit=-1"
+      when: ansible_os_family == "Debian" and hardening_level in ['standard', 'strict']
+      
+    - name: Configure PAM password complexity (RedHat)
+      lineinfile:
+        path: /etc/pam.d/system-auth
+        regexp: "pam_pwquality.so"
+        line: "password requisite pam_pwquality.so retry=3 minlen=8 maxrepeat=3 ucredit=-1 lcredit=-1 dcredit=-1 ocredit=-1"
+      when: ansible_os_family == "RedHat" and hardening_level in ['standard', 'strict']
+      
+    - name: Set session timeout
+      lineinfile:
+        path: /etc/profile
+        line: "export TMOUT={{ session_timeout }}"
+        backup: yes
+      when: hardening_level in ['standard', 'strict']
+      
+    - name: Lock unused system accounts
+      user:
+        name: "{{ item }}"
+        shell: /sbin/nologin
+        lock_password: yes
+      loop:
+        - bin
+        - daemon
+        - adm
+        - lp
+        - sync
+        - shutdown
+        - halt
+        - mail
+        - operator
+        - games
+        - ftp
+        - nobody
+      ignore_errors: yes
+      
+    # SSH hardening
+    - name: Configure SSH security settings
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "^#?{{ item.key }}"
+        line: "{{ item.key }} {{ item.value }}"
+        backup: yes
+      loop:
+        - { key: "Protocol", value: "2" }
+        - { key: "PermitRootLogin", value: "no" }
+        - { key: "PasswordAuthentication", value: "no" }
+        - { key: "PermitEmptyPasswords", value: "no" }
+        - { key: "X11Forwarding", value: "no" }
+        - { key: "MaxAuthTries", value: "{{ login_retries }}" }
+        - { key: "ClientAliveInterval", value: "300" }
+        - { key: "ClientAliveCountMax", value: "2" }
+        - { key: "AllowUsers", value: "ansible" }
+        - { key: "Banner", value: "/etc/issue.net" }
+        - { key: "Ciphers", value: "chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr" }
+        - { key: "MACs", value: "hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha2-256,hmac-sha2-512" }
+      when: configure_ssh
+      notify: restart ssh
+      
+    - name: Create SSH warning banner
+      copy:
+        content: |
+          ******************************************************************************
+          *                                                                            *
+          * This system is for the use of authorized users only. Individuals using    *
+          * this computer system without authority, or in excess of their authority,   *
+          * are subject to having all of their activities on this system monitored    *
+          * and recorded by system personnel.                                          *
+          *                                                                            *
+          * In the course of monitoring individuals improperly using this system, or  *
+          * in the course of system maintenance, the activities of authorized users   *
+          * may also be monitored.                                                    *
+          *                                                                            *
+          * Anyone using this system expressly consents to such monitoring and is     *
+          * advised that if such monitoring reveals possible evidence of criminal     *
+          * activity, system personnel may provide the evidence to law enforcement    *
+          * officials.                                                                 *
+          *                                                                            *
+          ******************************************************************************
+        dest: /etc/issue.net
+        mode: '0644'
+      when: configure_ssh
+      
+    # Kernel and network hardening
+    - name: Apply kernel hardening parameters
+      sysctl:
+        name: "{{ item.key }}"
+        value: "{{ item.value }}"
+        state: present
+        reload: yes
+        sysctl_file: /etc/sysctl.d/99-security.conf
+      loop:
+        # Network security
+        - { key: "net.ipv4.ip_forward", value: "0" }
+        - { key: "net.ipv4.conf.all.send_redirects", value: "0" }
+        - { key: "net.ipv4.conf.default.send_redirects", value: "0" }
+        - { key: "net.ipv4.conf.all.accept_redirects", value: "0" }
+        - { key: "net.ipv4.conf.default.accept_redirects", value: "0" }
+        - { key: "net.ipv6.conf.all.accept_redirects", value: "0" }
+        - { key: "net.ipv6.conf.default.accept_redirects", value: "0" }
+        - { key: "net.ipv4.conf.all.accept_source_route", value: "0" }
+        - { key: "net.ipv4.conf.default.accept_source_route", value: "0" }
+        - { key: "net.ipv6.conf.all.accept_source_route", value: "0" }
+        - { key: "net.ipv6.conf.default.accept_source_route", value: "0" }
+        - { key: "net.ipv4.conf.all.log_martians", value: "1" }
+        - { key: "net.ipv4.icmp_echo_ignore_broadcasts", value: "1" }
+        - { key: "net.ipv4.icmp_ignore_bogus_error_responses", value: "1" }
+        - { key: "net.ipv4.tcp_syncookies", value: "1" }
+        - { key: "net.ipv4.tcp_rfc1337", value: "1" }
+        # Memory protection
+        - { key: "kernel.randomize_va_space", value: "2" }
+        - { key: "kernel.kptr_restrict", value: "2" }
+        - { key: "kernel.dmesg_restrict", value: "1" }
+        - { key: "kernel.yama.ptrace_scope", value: "1" }
+        # Process restrictions
+        - { key: "fs.suid_dumpable", value: "0" }
+        - { key: "fs.protected_hardlinks", value: "1" }
+        - { key: "fs.protected_symlinks", value: "1" }
+      when: apply_kernel_hardening
+      
+    # Additional strict hardening
+    - name: Apply strict kernel parameters
+      sysctl:
+        name: "{{ item.key }}"
+        value: "{{ item.value }}"
+        state: present
+        reload: yes
+        sysctl_file: /etc/sysctl.d/99-security-strict.conf
+      loop:
+        - { key: "net.ipv4.icmp_echo_ignore_all", value: "1" }
+        - { key: "kernel.kexec_load_disabled", value: "1" }
+        - { key: "kernel.core_uses_pid", value: "1" }
+        - { key: "net.ipv4.tcp_timestamps", value: "0" }
+      when: apply_kernel_hardening and hardening_level == 'strict'
+      
+    # File system security
+    - name: Set secure file permissions
+      file:
+        path: "{{ item.path }}"
+        owner: "{{ item.owner }}"
+        group: "{{ item.group }}"
+        mode: "{{ item.mode }}"
+      loop:
+        - { path: "/etc/passwd", owner: "root", group: "root", mode: "0644" }
+        - { path: "/etc/shadow", owner: "root", group: "shadow", mode: "0640" }
+        - { path: "/etc/group", owner: "root", group: "root", mode: "0644" }
+        - { path: "/etc/gshadow", owner: "root", group: "shadow", mode: "0640" }
+        - { path: "/etc/crontab", owner: "root", group: "root", mode: "0600" }
+        - { path: "/etc/ssh/sshd_config", owner: "root", group: "root", mode: "0600" }
+        - { path: "/var/log", owner: "root", group: "root", mode: "0755" }
+        
+    - name: Restrict cron usage
+      file:
+        path: "{{ item }}"
+        state: touch
+        mode: '0600'
+        owner: root
+        group: root
+      loop:
+        - /etc/cron.allow
+        - /etc/at.allow
+        
+    - name: Add allowed users to cron.allow
+      lineinfile:
+        path: /etc/cron.allow
+        line: root
+        
+    # Firewall configuration
+    - name: Configure firewall (ufw - Debian/Ubuntu)
+      ufw:
+        rule: "{{ item.rule }}"
+        port: "{{ item.port }}"
+        proto: "{{ item.proto | default('tcp') }}"
+        comment: "{{ item.comment | default('') }}"
+      loop:
+        - { rule: "allow", port: "22", comment: "SSH" }
+        - { rule: "allow", port: "80", comment: "HTTP" }
+        - { rule: "allow", port: "443", comment: "HTTPS" }
+      when: enable_firewall and ansible_os_family == "Debian"
+      
+    - name: Enable ufw
+      ufw:
+        state: enabled
+        policy: deny
+      when: enable_firewall and ansible_os_family == "Debian"
+      
+    - name: Configure firewall (firewalld - RedHat/CentOS)
+      firewalld:
+        service: "{{ item }}"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      loop:
+        - ssh
+        - http
+        - https
+      when: enable_firewall and ansible_os_family == "RedHat"
+      
+    # Audit configuration
+    - name: Configure auditd
+      lineinfile:
+        path: /etc/audit/auditd.conf
+        regexp: "^{{ item.key }}"
+        line: "{{ item.key }} = {{ item.value }}"
+        backup: yes
+      loop:
+        - { key: "max_log_file", value: "10" }
+        - { key: "num_logs", value: "5" }
+        - { key: "max_log_file_action", value: "rotate" }
+        - { key: "space_left_action", value: "email" }
+        - { key: "disk_full_action", value: "halt" }
+        - { key: "disk_error_action", value: "halt" }
+      when: install_security_tools
+      notify: restart auditd
+      
+    - name: Add audit rules
+      copy:
+        content: |
+          # Audit rules for security monitoring
+          -D
+          -b 8192
+          -f 1
+          
+          # Monitor authentication events
+          -w /var/log/auth.log -p wa -k authentication
+          -w /etc/passwd -p wa -k identity
+          -w /etc/group -p wa -k identity
+          -w /etc/shadow -p wa -k identity
+          -w /etc/gshadow -p wa -k identity
+          
+          # Monitor system configuration
+          -w /etc/ssh/sshd_config -p wa -k ssh-config
+          -w /etc/sudoers -p wa -k sudo-config
+          -w /etc/hosts -p wa -k network-config
+          
+          # Monitor privileged commands
+          -a exit,always -F path=/usr/bin/su -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged
+          -a exit,always -F path=/usr/bin/sudo -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged
+          
+          # Make configuration immutable
+          -e 2
+        dest: /etc/audit/rules.d/security.rules
+        mode: '0600'
+        backup: yes
+      when: install_security_tools
+      notify: restart auditd
+      
+    # Fail2ban configuration
+    - name: Configure fail2ban
+      template:
+        src: jail.local.j2
+        dest: /etc/fail2ban/jail.local
+        mode: '0644'
+        backup: yes
+      when: install_security_tools
+      notify: restart fail2ban
+      
+    # Log configuration
+    - name: Configure rsyslog for security logging
+      blockinfile:
+        path: /etc/rsyslog.conf
+        block: |
+          # Security logging
+          auth,authpriv.*                 /var/log/auth.log
+          *.info;mail.none;authpriv.none;cron.none    /var/log/messages
+          local0.*                        /var/log/security.log
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - Security logging"
+        backup: yes
+      when: configure_logging
+      notify: restart rsyslog
+      
+    - name: Configure log rotation
+      copy:
+        content: |
+          /var/log/auth.log
+          /var/log/security.log
+          /var/log/messages
+          {
+              weekly
+              missingok
+              rotate 52
+              compress
+              delaycompress
+              notifempty
+              create 640 root adm
+              postrotate
+                  invoke-rc.d rsyslog rotate > /dev/null 2>&1 || true
+              endscript
+          }
+        dest: /etc/logrotate.d/security
+        mode: '0644'
+      when: configure_logging
+      
+    # Service hardening
+    - name: Disable unnecessary services
+      systemd:
+        name: "{{ item }}"
+        enabled: no
+        state: stopped
+      loop:
+        - avahi-daemon
+        - cups
+        - bluetooth
+        - rpcbind
+        - nfs-server
+        - ypbind
+        - talk
+        - telnet
+      ignore_errors: yes
+      when: hardening_level in ['standard', 'strict']
+      
+    # File integrity monitoring
+    - name: Initialize AIDE database
+      shell: |
+        if [ ! -f /var/lib/aide/aide.db ]; then
+          aide --init
+          mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
+        fi
+      when: install_security_tools
+      
+    - name: Schedule security monitoring tasks
+      cron:
+        name: "{{ item.name }}"
+        minute: "{{ item.minute }}"
+        hour: "{{ item.hour }}"
+        job: "{{ item.job }}"
+        user: root
+      loop:
+        - name: "Daily AIDE integrity check"
+          minute: "0"
+          hour: "3"
+          job: "/usr/bin/aide --check 2>&1 | /usr/bin/logger -t aide"
+        - name: "Weekly rootkit scan"
+          minute: "30"
+          hour: "2"
+          job: "/usr/bin/rkhunter --check --skip-keypress --report-warnings-only 2>&1 | /usr/bin/logger -t rkhunter"
+        - name: "Daily failed login report"
+          minute: "0"
+          hour: "8"
+          job: "/bin/grep 'authentication failure' /var/log/auth.log | /usr/bin/tail -20 | /usr/bin/logger -t failed-logins"
+      when: install_security_tools
+      
+  post_tasks:
+    - name: Generate hardening report
+      template:
+        src: hardening-report.j2
+        dest: /var/log/security-hardening-report.txt
+        mode: '0600'
+        
+    - name: Log hardening completion
+      lineinfile:
+        path: /var/log/security-hardening.log
+        line: "{{ ansible_date_time.iso8601 }} - Security hardening completed ({{ hardening_level }} level)"
+        
+    - name: Display hardening summary
+      debug:
+        msg: |
+          Security Hardening Complete
+          ==========================
+          Level: {{ hardening_level }}
+          SSH configured: {{ configure_ssh }}
+          Firewall enabled: {{ enable_firewall }}
+          Security tools installed: {{ install_security_tools }}
+          Logging configured: {{ configure_logging }}
+          Kernel hardening applied: {{ apply_kernel_hardening }}
+          
+          Report available at: /var/log/security-hardening-report.txt
+          
+          Recommended next steps:
+          1. Review firewall rules for your specific needs
+          2. Configure monitoring and alerting
+          3. Test all applications and services
+          4. Implement additional security controls as needed
+          5. Schedule regular security audits
+          
+  handlers:
+    - name: restart ssh
+      systemd:
+        name: sshd
+        state: restarted
+        
+    - name: restart auditd
+      systemd:
+        name: auditd
+        state: restarted
+        
+    - name: restart fail2ban
+      systemd:
+        name: fail2ban
+        state: restarted
+        enabled: yes
+        
+    - name: restart rsyslog
+      systemd:
+        name: rsyslog
+        state: restarted

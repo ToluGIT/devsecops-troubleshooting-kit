@@ -1,0 +1,210 @@
+---
+# Security Incident Response Playbook
+# This playbook provides automated incident response procedures
+# for common security incidents
+
+- name: Security Incident Response Automation
+  hosts: localhost
+  gather_facts: no
+  vars:
+    incident_id: "{{ incident_id | default('INC-' + ansible_date_time.epoch) }}"
+    incident_type: "{{ incident_type | mandatory }}"
+    affected_systems: "{{ affected_systems | default([]) }}"
+    severity: "{{ severity | default('medium') }}"
+    evidence_dir: "./incident-{{ incident_id }}"
+    
+  tasks:
+    - name: Validate incident parameters
+      fail:
+        msg: "Invalid incident type. Must be one of: malware, data_breach, unauthorized_access, ddos, insider_threat"
+      when: incident_type not in ['malware', 'data_breach', 'unauthorized_access', 'ddos', 'insider_threat']
+      
+    - name: Create incident response directory
+      file:
+        path: "{{ evidence_dir }}/{{ item }}"
+        state: directory
+        mode: '0700'
+      loop:
+        - evidence
+        - logs
+        - reports
+        - communications
+        - actions
+        
+    - name: Generate incident response report template
+      template:
+        src: incident-report.md.j2
+        dest: "{{ evidence_dir }}/reports/incident-{{ incident_id }}-report.md"
+        mode: '0600'
+        
+    - name: Log incident start
+      lineinfile:
+        path: "{{ evidence_dir }}/logs/incident-timeline.log"
+        line: "{{ ansible_date_time.iso8601 }} - Incident {{ incident_id }} ({{ incident_type }}) response initiated"
+        create: yes
+        mode: '0600'
+        
+    # Malware incident response
+    - name: Malware incident response
+      include_tasks: tasks/malware-response.yml
+      when: incident_type == 'malware'
+      
+    # Data breach response
+    - name: Data breach response
+      include_tasks: tasks/data-breach-response.yml
+      when: incident_type == 'data_breach'
+      
+    # Unauthorized access response
+    - name: Unauthorized access response
+      include_tasks: tasks/unauthorized-access-response.yml
+      when: incident_type == 'unauthorized_access'
+      
+    # DDoS attack response
+    - name: DDoS attack response
+      include_tasks: tasks/ddos-response.yml
+      when: incident_type == 'ddos'
+      
+    # Insider threat response
+    - name: Insider threat response
+      include_tasks: tasks/insider-threat-response.yml
+      when: incident_type == 'insider_threat'
+      
+    - name: Generate incident summary
+      template:
+        src: incident-summary.j2
+        dest: "{{ evidence_dir }}/reports/incident-{{ incident_id }}-summary.txt"
+        mode: '0600'
+        
+    - name: Display incident response completion
+      debug:
+        msg: |
+          Incident Response Completed
+          ===========================
+          Incident ID: {{ incident_id }}
+          Type: {{ incident_type }}
+          Severity: {{ severity }}
+          Evidence Directory: {{ evidence_dir }}
+          
+          Next Steps:
+          1. Review evidence in {{ evidence_dir }}/evidence/
+          2. Complete investigation report in {{ evidence_dir }}/reports/
+          3. Implement remediation actions
+          4. Conduct post-incident review
+          
+- name: System isolation and evidence collection
+  hosts: "{{ affected_systems | default([]) }}"
+  serial: 1
+  become: yes
+  gather_facts: yes
+  vars:
+    isolation_mode: "{{ isolation_mode | default('network') }}"
+    evidence_collection: "{{ evidence_collection | default(true) }}"
+    
+  tasks:
+    - name: Create local evidence directory
+      file:
+        path: "/tmp/incident-{{ incident_id }}"
+        state: directory
+        mode: '0700'
+      when: evidence_collection
+      
+    - name: Collect system information
+      shell: |
+        echo " System Information " > /tmp/incident-{{ incident_id }}/system-info.txt
+        uname -a >> /tmp/incident-{{ incident_id }}/system-info.txt
+        date >> /tmp/incident-{{ incident_id }}/system-info.txt
+        uptime >> /tmp/incident-{{ incident_id }}/system-info.txt
+        echo "" >> /tmp/incident-{{ incident_id }}/system-info.txt
+        
+        echo " Network Connections " >> /tmp/incident-{{ incident_id }}/network-info.txt
+        netstat -tulpn >> /tmp/incident-{{ incident_id }}/network-info.txt
+        echo "" >> /tmp/incident-{{ incident_id }}/network-info.txt
+        ss -tulpn >> /tmp/incident-{{ incident_id }}/network-info.txt
+        
+        echo " Running Processes " >> /tmp/incident-{{ incident_id }}/process-info.txt
+        ps aux >> /tmp/incident-{{ incident_id }}/process-info.txt
+        echo "" >> /tmp/incident-{{ incident_id }}/process-info.txt
+        pstree -p >> /tmp/incident-{{ incident_id }}/process-info.txt
+        
+        echo " System Logs " >> /tmp/incident-{{ incident_id }}/system-logs.txt
+        journalctl --since "1 hour ago" >> /tmp/incident-{{ incident_id }}/system-logs.txt
+        
+        echo " Authentication Logs " >> /tmp/incident-{{ incident_id }}/auth-logs.txt
+        grep -i "failed\|invalid\|authentication failure" /var/log/auth.log | tail -100 >> /tmp/incident-{{ incident_id }}/auth-logs.txt || true
+        
+        echo " File System Information " >> /tmp/incident-{{ incident_id }}/filesystem-info.txt
+        df -h >> /tmp/incident-{{ incident_id }}/filesystem-info.txt
+        echo "" >> /tmp/incident-{{ incident_id }}/filesystem-info.txt
+        mount >> /tmp/incident-{{ incident_id }}/filesystem-info.txt
+        
+        echo "User Information " >> /tmp/incident-{{ incident_id }}/user-info.txt
+        who >> /tmp/incident-{{ incident_id }}/user-info.txt
+        echo "" >> /tmp/incident-{{ incident_id }}/user-info.txt
+        w >> /tmp/incident-{{ incident_id }}/user-info.txt
+        echo "" >> /tmp/incident-{{ incident_id }}/user-info.txt
+        last -10 >> /tmp/incident-{{ incident_id }}/user-info.txt
+      when: evidence_collection
+      
+    - name: Collect memory dump (if requested)
+      shell: |
+        if command -v volatility &> /dev/null; then
+          dd if=/dev/fmem of=/tmp/incident-{{ incident_id }}/memory-dump.raw bs=1M || true
+        fi
+      when: evidence_collection and collect_memory_dump | default(false)
+      
+    - name: Network isolation - block all traffic
+      iptables:
+        chain: "{{ item.chain }}"
+        policy: DROP
+      loop:
+        - { chain: INPUT }
+        - { chain: OUTPUT }
+        - { chain: FORWARD }
+      when: isolation_mode == 'full'
+      
+    - name: Network isolation - block internet only
+      iptables:
+        chain: OUTPUT
+        destination: "{{ item }}"
+        jump: DROP
+      loop:
+        - "0.0.0.0/0"
+      when: isolation_mode == 'network'
+      
+    - name: Allow SSH for investigation
+      iptables:
+        chain: INPUT
+        protocol: tcp
+        destination_port: 22
+        source: "{{ ansible_default_ipv4.gateway }}/24"
+        jump: ACCEPT
+      when: isolation_mode in ['network', 'full']
+      
+    - name: Fetch evidence to control machine
+      fetch:
+        src: "/tmp/incident-{{ incident_id }}/{{ item }}"
+        dest: "{{ evidence_dir }}/evidence/{{ inventory_hostname }}_{{ item }}"
+        flat: yes
+      loop:
+        - system-info.txt
+        - network-info.txt
+        - process-info.txt
+        - system-logs.txt
+        - auth-logs.txt
+        - filesystem-info.txt
+        - user-info.txt
+      when: evidence_collection
+      ignore_errors: yes
+      
+    - name: Create system isolation report
+      template:
+        src: isolation-report.j2
+        dest: "/tmp/incident-{{ incident_id }}/isolation-report.txt"
+        mode: '0600'
+      delegate_to: localhost
+      
+    - name: Log isolation completion
+      lineinfile:
+        path: "{{ evidence_dir }}/logs/incident-timeline.log"
+        line: "{{ ansible_date_time.iso8601 }} - System {{ inventory_hostname }} isolated ({{ isolation_mode }} mode)"
+      delegate_to: localhost

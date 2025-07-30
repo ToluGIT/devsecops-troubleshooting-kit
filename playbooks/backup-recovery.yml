@@ -1,0 +1,442 @@
+---
+# Security-Focused Backup and Recovery Playbook
+# This playbook implements secure backup procedures and recovery testing
+
+- name: Secure Backup and Recovery Operations
+  hosts: all
+  become: yes
+  vars:
+    backup_type: "{{ backup_type | default('incremental') }}"  # full, incremental, differential
+    backup_destination: "{{ backup_destination | default('/backup') }}"
+    retention_days: "{{ retention_days | default(30) }}"
+    encryption_enabled: "{{ encryption_enabled | default(true) }}"
+    compression_enabled: "{{ compression_enabled | default(true) }}"
+    backup_timestamp: "{{ ansible_date_time.epoch }}"
+    
+    # Backup sets
+    critical_paths:
+      - /etc
+      - /home
+      - /var/log
+      - /opt
+      - /usr/local
+    
+    database_backup: "{{ database_backup | default(false) }}"
+    application_backup: "{{ application_backup | default(false) }}"
+    
+  pre_tasks:
+    - name: Validate backup configuration
+      fail:
+        msg: "Invalid backup type. Must be one of: full, incremental, differential"
+      when: backup_type not in ['full', 'incremental', 'differential']
+      
+    - name: Check backup destination
+      stat:
+        path: "{{ backup_destination }}"
+      register: backup_dest
+      
+    - name: Create backup destination
+      file:
+        path: "{{ backup_destination }}"
+        state: directory
+        mode: '0700'
+        owner: root
+        group: root
+      when: not backup_dest.stat.exists
+      
+    - name: Create backup subdirectories
+      file:
+        path: "{{ backup_destination }}/{{ item }}"
+        state: directory
+        mode: '0700'
+        owner: root
+        group: root
+      loop:
+        - system
+        - databases
+        - applications
+        - logs
+        - archives
+        
+    - name: Install backup tools
+      package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - rsync
+        - tar
+        - gzip
+        - gnupg
+        - duplicity
+        - mysqldump
+        - postgresql-client
+      ignore_errors: yes
+      
+    - name: Log backup start
+      lineinfile:
+        path: "{{ backup_destination }}/backup.log"
+        line: "{{ ansible_date_time.iso8601 }} - Starting {{ backup_type }} backup"
+        create: yes
+        mode: '0600'
+        
+  tasks:
+    # System backup
+    - name: Create system configuration backup
+      shell: |
+        tar -czf {{ backup_destination }}/system/system-config-{{ backup_timestamp }}.tar.gz \
+          --exclude=/proc \
+          --exclude=/sys \
+          --exclude=/dev \
+          --exclude=/tmp \
+          --exclude=/var/tmp \
+          --exclude=/var/cache \
+          --exclude=/var/log/journal \
+          /etc /usr/local/etc 2>/dev/null || true
+      when: backup_type == 'full'
+      
+    - name: Create incremental system backup
+      shell: |
+        find /etc /usr/local/etc -newer {{ backup_destination }}/system/last-backup.timestamp -type f -exec tar -czf {{ backup_destination }}/system/system-incremental-{{ backup_timestamp }}.tar.gz {} + 2>/dev/null || true
+        touch {{ backup_destination }}/system/last-backup.timestamp
+      when: backup_type == 'incremental'
+      
+    - name: Backup user data
+      synchronize:
+        src: /home/
+        dest: "{{ backup_destination }}/system/home-{{ backup_timestamp }}/"
+        delete: no
+        recursive: yes
+        archive: yes
+        compress: yes
+        rsync_opts:
+          - "--exclude=.cache"
+          - "--exclude=.tmp"
+          - "--exclude=.mozilla/firefox/*/Cache"
+          - "--exclude=.thunderbird/*/ImapMail/*/INBOX.msf"
+      delegate_to: "{{ inventory_hostname }}"
+      
+    # Application backup
+    - name: Backup web applications
+      shell: |
+        if [ -d /var/www ]; then
+          tar -czf {{ backup_destination }}/applications/web-apps-{{ backup_timestamp }}.tar.gz \
+            --exclude="*.log" \
+            --exclude="cache/*" \
+            --exclude="tmp/*" \
+            /var/www
+        fi
+      when: application_backup
+      ignore_errors: yes
+      
+    - name: Backup application configurations
+      shell: |
+        # Backup common application directories
+        for app_dir in /opt /usr/local; do
+          if [ -d "$app_dir" ]; then
+            tar -czf {{ backup_destination }}/applications/$(basename $app_dir)-{{ backup_timestamp }}.tar.gz $app_dir
+          fi
+        done
+        
+        # Backup systemd service files
+        tar -czf {{ backup_destination }}/applications/systemd-services-{{ backup_timestamp }}.tar.gz \
+          /etc/systemd/system \
+          /lib/systemd/system 2>/dev/null || true
+      when: application_backup
+      
+    # Database backup
+    - name: Backup MySQL databases
+      shell: |
+        if systemctl is-active --quiet mysql || systemctl is-active --quiet mariadb; then
+          mysqldump --all-databases --single-transaction --routines --triggers > {{ backup_destination }}/databases/mysql-all-{{ backup_timestamp }}.sql
+          gzip {{ backup_destination }}/databases/mysql-all-{{ backup_timestamp }}.sql
+        fi
+      when: database_backup
+      ignore_errors: yes
+      
+    - name: Backup PostgreSQL databases
+      shell: |
+        if systemctl is-active --quiet postgresql; then
+          su - postgres -c "pg_dumpall" > {{ backup_destination }}/databases/postgresql-all-{{ backup_timestamp }}.sql
+          gzip {{ backup_destination }}/databases/postgresql-all-{{ backup_timestamp }}.sql
+        fi
+      when: database_backup
+      ignore_errors: yes
+      
+    # Security-specific backups
+    - name: Backup security configurations
+      shell: |
+        # Create security configuration archive
+        tar -czf {{ backup_destination }}/system/security-config-{{ backup_timestamp }}.tar.gz \
+          /etc/ssh \
+          /etc/ssl \
+          /etc/pki \
+          /etc/audit \
+          /etc/fail2ban \
+          /etc/iptables \
+          /etc/sudoers* \
+          /etc/pam.d \
+          /etc/security \
+          /etc/apparmor.d \
+          /etc/selinux 2>/dev/null || true
+          
+        # Backup firewall rules
+        iptables-save > {{ backup_destination }}/system/iptables-rules-{{ backup_timestamp }}.txt
+        ip6tables-save > {{ backup_destination }}/system/ip6tables-rules-{{ backup_timestamp }}.txt 2>/dev/null || true
+        
+        # Backup user and group information
+        cp /etc/passwd {{ backup_destination }}/system/passwd-{{ backup_timestamp }}
+        cp /etc/shadow {{ backup_destination }}/system/shadow-{{ backup_timestamp }}
+        cp /etc/group {{ backup_destination }}/system/group-{{ backup_timestamp }}
+        cp /etc/gshadow {{ backup_destination }}/system/gshadow-{{ backup_timestamp }}
+        
+        # Set secure permissions on sensitive backup files
+        chmod 600 {{ backup_destination }}/system/shadow-{{ backup_timestamp }}
+        chmod 600 {{ backup_destination }}/system/gshadow-{{ backup_timestamp }}
+      
+    - name: Backup log files
+      shell: |
+        # Archive current logs
+        tar -czf {{ backup_destination }}/logs/system-logs-{{ backup_timestamp }}.tar.gz \
+          /var/log/auth.log* \
+          /var/log/syslog* \
+          /var/log/messages* \
+          /var/log/secure* \
+          /var/log/audit/* \
+          /var/log/fail2ban.log* 2>/dev/null || true
+          
+        # Backup application logs
+        if [ -d /var/log/apache2 ]; then
+          tar -czf {{ backup_destination }}/logs/apache-logs-{{ backup_timestamp }}.tar.gz /var/log/apache2
+        fi
+        
+        if [ -d /var/log/nginx ]; then
+          tar -czf {{ backup_destination }}/logs/nginx-logs-{{ backup_timestamp }}.tar.gz /var/log/nginx
+        fi
+        
+        # Backup journal logs
+        journalctl --since "24 hours ago" > {{ backup_destination }}/logs/journal-{{ backup_timestamp }}.txt
+        gzip {{ backup_destination }}/logs/journal-{{ backup_timestamp }}.txt
+      
+    # Encryption of backups
+    - name: Encrypt backup files
+      shell: |
+        if [ "{{ encryption_enabled }}" = "true" ]; then
+          # Create encryption key if it doesn't exist
+          if [ ! -f {{ backup_destination }}/backup-key.gpg ]; then
+            openssl rand -base64 32 > {{ backup_destination }}/backup-encryption.key
+            chmod 600 {{ backup_destination }}/backup-encryption.key
+          fi
+          
+          # Encrypt backup files
+          for backup_file in $(find {{ backup_destination }} -name "*.tar.gz" -o -name "*.sql.gz" | grep -v ".gpg"); do
+            if [ ! -f "${backup_file}.gpg" ]; then
+              gpg --cipher-algo AES256 --digest-algo SHA512 --cert-digest-algo SHA512 --compress-algo 1 --s2k-mode 3 --s2k-digest-algo SHA512 --s2k-count 65011712 --force-mdc --no-symkey-cache --quiet --batch --yes --passphrase-file {{ backup_destination }}/backup-encryption.key --symmetric --output "${backup_file}.gpg" "$backup_file"
+              
+              if [ $? -eq 0 ]; then
+                rm "$backup_file"
+              fi
+            fi
+          done
+        fi
+      when: encryption_enabled
+      
+    # Backup verification
+    - name: Verify backup integrity
+      shell: |
+        # Create backup manifest
+        echo "Backup Integrity Report - {{ ansible_date_time.iso8601 }}" > {{ backup_destination }}/backup-manifest-{{ backup_timestamp }}.txt
+        echo "========================================" >> {{ backup_destination }}/backup-manifest-{{ backup_timestamp }}.txt
+        
+        # List all backup files with checksums
+        find {{ backup_destination }} -type f -name "*.tar.gz*" -o -name "*.sql.gz*" -exec sha256sum {} \; >> {{ backup_destination }}/backup-manifest-{{ backup_timestamp }}.txt
+        
+        # Check backup file sizes
+        echo "" >> {{ backup_destination }}/backup-manifest-{{ backup_timestamp }}.txt
+        echo "Backup File Sizes:" >> {{ backup_destination }}/backup-manifest-{{ backup_timestamp }}.txt
+        echo "==================" >> {{ backup_destination }}/backup-manifest-{{ backup_timestamp }}.txt
+        du -sh {{ backup_destination }}/* >> {{ backup_destination }}/backup-manifest-{{ backup_timestamp }}.txt
+        
+        # Test a sample backup file
+        sample_backup=$(find {{ backup_destination }} -name "*.tar.gz" | head -1)
+        if [ -n "$sample_backup" ]; then
+          echo "" >> {{ backup_destination }}/backup-manifest-{{ backup_timestamp }}.txt
+          echo "Sample Backup Test:" >> {{ backup_destination }}/backup-manifest-{{ backup_timestamp }}.txt
+          echo "===================" >> {{ backup_destination }}/backup-manifest-{{ backup_timestamp }}.txt
+          tar -tzf "$sample_backup" | head -10 >> {{ backup_destination }}/backup-manifest-{{ backup_timestamp }}.txt
+        fi
+      
+    # Cleanup old backups
+    - name: Cleanup old backup files
+      shell: |
+        # Remove backups older than retention period
+        find {{ backup_destination }}/system -name "*.tar.gz*" -mtime +{{ retention_days }} -delete
+        find {{ backup_destination }}/databases -name "*.sql.gz*" -mtime +{{ retention_days }} -delete
+        find {{ backup_destination }}/applications -name "*.tar.gz*" -mtime +{{ retention_days }} -delete
+        find {{ backup_destination }}/logs -name "*.tar.gz*" -mtime +{{ retention_days }} -delete
+        
+        # Remove old manifests
+        find {{ backup_destination }} -name "backup-manifest-*.txt" -mtime +{{ retention_days }} -delete
+        
+        echo "{{ ansible_date_time.iso8601 }} - Cleaned up backups older than {{ retention_days }} days" >> {{ backup_destination }}/backup.log
+      
+  post_tasks:
+    - name: Generate backup report
+      template:
+        src: backup-report.j2
+        dest: "{{ backup_destination }}/backup-report-{{ backup_timestamp }}.txt"
+        mode: '0600'
+        
+    - name: Create backup index
+      shell: |
+        echo "Backup Index - Updated {{ ansible_date_time.iso8601 }}" > {{ backup_destination }}/backup-index.txt
+        echo "=============================================" >> {{ backup_destination }}/backup-index.txt
+        echo "" >> {{ backup_destination }}/backup-index.txt
+        
+        echo "Available Backups:" >> {{ backup_destination }}/backup-index.txt
+        echo "==================" >> {{ backup_destination }}/backup-index.txt
+        
+        for dir in system databases applications logs; do
+          if [ -d "{{ backup_destination }}/$dir" ]; then
+            echo "" >> {{ backup_destination }}/backup-index.txt
+            echo "$dir backups:" >> {{ backup_destination }}/backup-index.txt
+            ls -la {{ backup_destination }}/$dir/ >> {{ backup_destination }}/backup-index.txt
+          fi
+        done
+        
+        echo "" >> {{ backup_destination }}/backup-index.txt
+        echo "Disk Usage:" >> {{ backup_destination }}/backup-index.txt
+        echo "===========" >> {{ backup_destination }}/backup-index.txt
+        df -h {{ backup_destination }} >> {{ backup_destination }}/backup-index.txt
+        
+    - name: Log backup completion
+      lineinfile:
+        path: "{{ backup_destination }}/backup.log"
+        line: "{{ ansible_date_time.iso8601 }} - {{ backup_type }} backup completed successfully"
+        
+    - name: Display backup summary
+      debug:
+        msg: |
+          Backup Operation Completed
+          =========================
+          Type: {{ backup_type }}
+          Destination: {{ backup_destination }}
+          Encryption: {{ encryption_enabled }}
+          Compression: {{ compression_enabled }}
+          
+          Backup Contents:
+          - System configurations: {{ backup_destination }}/system/
+          - Database backups: {{ backup_destination }}/databases/
+          - Application backups: {{ backup_destination }}/applications/
+          - Log archives: {{ backup_destination }}/logs/
+          
+          Files:
+          - Backup report: {{ backup_destination }}/backup-report-{{ backup_timestamp }}.txt
+          - Integrity manifest: {{ backup_destination }}/backup-manifest-{{ backup_timestamp }}.txt
+          - Backup index: {{ backup_destination }}/backup-index.txt
+          - Backup log: {{ backup_destination }}/backup.log
+          
+          Next Steps:
+          1. Verify backup integrity
+          2. Test restore procedures
+          3. Store backup securely (offsite/cloud)
+          4. Schedule regular backup maintenance
+          
+# Recovery Testing Playbook
+- name: Backup Recovery Testing
+  hosts: localhost
+  become: yes
+  vars:
+    test_restore_dir: "/tmp/restore-test-{{ ansible_date_time.epoch }}"
+    backup_source: "{{ backup_source | mandatory }}"
+    recovery_type: "{{ recovery_type | default('partial') }}"  # partial, full
+    
+  tasks:
+    - name: Create recovery test environment
+      file:
+        path: "{{ test_restore_dir }}"
+        state: directory
+        mode: '0700'
+        
+    - name: Test backup file integrity
+      shell: |
+        echo "Testing backup integrity for: {{ backup_source }}"
+        
+        if [[ "{{ backup_source }}" == *.gpg ]]; then
+          # Test encrypted backup
+          if [ -f "{{ backup_destination }}/backup-encryption.key" ]; then
+            gpg --batch --yes --quiet --decrypt --passphrase-file {{ backup_destination }}/backup-encryption.key "{{ backup_source }}" > {{ test_restore_dir }}/test-decrypt.tar.gz
+            tar -tzf {{ test_restore_dir }}/test-decrypt.tar.gz > /dev/null && echo "Encrypted backup integrity: OK" || echo "Encrypted backup integrity: FAILED"
+          else
+            echo "Encryption key not found - cannot test encrypted backup"
+          fi
+        else
+          # Test unencrypted backup
+          tar -tzf "{{ backup_source }}" > /dev/null && echo "Backup integrity: OK" || echo "Backup integrity: FAILED"
+        fi
+      register: integrity_test
+      
+    - name: Perform partial recovery test
+      shell: |
+        # Extract a sample of files for testing
+        if [[ "{{ backup_source }}" == *.tar.gz ]]; then
+          tar -xzf "{{ backup_source }}" -C {{ test_restore_dir }} --wildcards "*/passwd" --wildcards "*/group" 2>/dev/null || true
+          
+          # Check if files were restored
+          if [ -n "$(find {{ test_restore_dir }} -name passwd -o -name group)" ]; then
+            echo "Partial recovery test: SUCCESS"
+          else
+            echo "Partial recovery test: FAILED"
+          fi
+        fi
+      when: recovery_type == 'partial'
+      register: partial_recovery
+      
+    - name: Generate recovery test report
+      shell: |
+        cat > {{ test_restore_dir }}/recovery-test-report.txt << 'EOF'
+        Recovery Test Report
+        ===================
+        Test Date: {{ ansible_date_time.iso8601 }}
+        Backup Source: {{ backup_source }}
+        Recovery Type: {{ recovery_type }}
+        Test Directory: {{ test_restore_dir }}
+        
+        Test Results:
+        =============
+        Integrity Test: {{ integrity_test.stdout }}
+        {% if recovery_type == 'partial' %}
+        Partial Recovery: {{ partial_recovery.stdout }}
+        {% endif %}
+        
+        Recommendations:
+        ===============
+        1. Verify all critical files can be restored
+        2. Test database recovery procedures
+        3. Validate application configurations
+        4. Document recovery procedures
+        5. Schedule regular recovery testing
+        
+        EOF
+        
+    - name: Cleanup test environment
+      file:
+        path: "{{ test_restore_dir }}"
+        state: absent
+      when: cleanup_test_env | default(true)
+      
+    - name: Display recovery test results
+      debug:
+        msg: |
+          Recovery Test Completed
+          ======================
+          Backup Source: {{ backup_source }}
+          Test Results Available At: {{ test_restore_dir }}/recovery-test-report.txt
+          
+          {% if integrity_test.stdout is defined %}
+          Integrity Test: {{ integrity_test.stdout }}
+          {% endif %}
+          {% if partial_recovery.stdout is defined %}
+          Recovery Test: {{ partial_recovery.stdout }}
+          {% endif %}
+          
+          Ensure regular recovery testing to validate backup reliability.
